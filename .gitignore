@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local environments
+.venv/
+.build-env/
+venv/
+
+# Packaging output
+build/
+dist/
+*.spec
+*.exe
+
+# Local analysis data and exports
+*.sqlite
+*.sqlite3
+*.db
+*_results_*/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+

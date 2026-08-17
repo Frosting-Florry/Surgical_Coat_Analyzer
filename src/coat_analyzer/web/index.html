@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Surgical Coat Analyzer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><strong>Surgical Coat Analyzer</strong><span id="projectBadge">未打开项目</span></div>
+    <nav id="mainNav" class="hidden">
+      <button data-view="annotate" class="active">逐图标注</button>
+      <button data-view="groups">批量分组</button>
+      <button data-view="export">项目与导出</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="homeView" class="home-card">
+      <h1>小鼠手术区域毛色分析</h1>
+      <p>所有图片、标注和统计均保留在本机。原始图片不会被移动或修改。</p>
+      <div class="home-grid">
+        <article>
+          <h2>新建项目</h2>
+          <label>项目名称<input id="newName" placeholder="例如：2026-08 毛色实验"></label>
+          <label>照片文件夹<span class="path-row"><input id="sourcePath"><button id="browseSource">浏览</button></span></label>
+          <label>SQLite 项目文件（默认保存在照片文件夹内）<span class="path-row"><input id="databasePath"><button id="browseSave">浏览</button></span></label>
+          <button id="createProject" class="primary wide">扫描照片并创建</button>
+        </article>
+        <article>
+          <h2>打开现有项目</h2>
+          <label>SQLite 项目文件<span class="path-row"><input id="openPath"><button id="browseOpen">浏览</button></span></label>
+          <button id="openProject" class="wide">打开项目</button>
+        </article>
+      </div>
+    </section>
+
+    <section id="annotateView" class="app-view hidden">
+      <aside class="image-sidebar">
+        <div class="sidebar-title"><strong>照片</strong><span id="progressText"></span></div>
+        <input id="imageFilter" placeholder="筛选文件名">
+        <div id="imageList" class="image-list"></div>
+      </aside>
+
+      <section class="workspace">
+        <div class="canvas-toolbar">
+          <div id="toolButtons" class="segmented">
+            <button data-tool="pan">平移</button>
+            <button data-tool="roi" class="active">手术区</button>
+            <button data-tool="left">左边缘</button>
+            <button data-tool="right">右边缘</button>
+            <button data-tool="exclude">排除区</button>
+            <button data-tool="gray">灰卡</button>
+          </div>
+          <button id="finishPolygon">闭合当前图形</button>
+          <button id="undo">撤销</button>
+          <button id="fitImage">适应窗口</button>
+          <span id="zoomText">100%</span>
+        </div>
+        <div id="canvasWrap" class="canvas-wrap">
+          <canvas id="mainCanvas"></canvas>
+          <div id="canvasHint" class="canvas-hint">请选择一张图片</div>
+        </div>
+        <div class="legend">
+          <span><i class="gold"></i>手术区</span><span><i class="blue"></i>左边缘</span>
+          <span><i class="red"></i>右边缘</span><span><i class="green"></i>左/中分界</span>
+          <span><i class="orange"></i>中/右分界</span><span><i class="magenta"></i>排除区</span>
+          <span><i class="cyan"></i>灰卡</span>
+          <span><i class="white-hair"></i>白发遮罩</span><span><i class="black-hair"></i>黑发遮罩</span>
+        </div>
+      </section>
+
+      <aside class="control-panel">
+        <h2 id="currentName">尚未选择图片</h2>
+        <p id="currentMeta" class="muted"></p>
+        <div class="instruction" id="toolHelp">单击添加手术区顶点，完成后点击“闭合当前图形”。</div>
+
+        <h3>分区定义</h3>
+        <label>左/中分界 <output id="splitLeftLabel">40%</output>
+          <input id="splitLeft" type="range" min="5" max="90" value="40">
+        </label>
+        <label>中/右分界 <output id="splitRightLabel">60%</output>
+          <input id="splitRight" type="range" min="10" max="95" value="60">
+        </label>
+        <button id="calculate" class="primary wide">计算并刷新分区</button>
+        <p id="analysisStatus" class="muted">尚未计算</p>
+
+        <h3>颜色结果</h3>
+        <label>显示模式
+          <select id="metricMode">
+            <option value="raw">原始颜色深度</option>
+            <option value="gray_corrected">灰卡校正颜色深度</option>
+          </select>
+        </label>
+        <p id="metricModeNote" class="muted"></p>
+        <div id="metricCards" class="metric-grid">
+          <div class="empty">完成 ROI 和左右边缘后显示</div>
+        </div>
+
+        <h3>黑白发面积</h3>
+        <p class="muted">以颜色深度 0（最白）–100（最黑）定义两个独立范围；未覆盖的灰发范围不计入两类。</p>
+        <div class="range-grid">
+          <label>白发下限<input id="whiteDepthMin" type="number" min="0" max="100" step="0.1" value="0"></label>
+          <label>白发上限<input id="whiteDepthMax" type="number" min="0" max="100" step="0.1" value="25"></label>
+          <label>黑发下限<input id="blackDepthMin" type="number" min="0" max="100" step="0.1" value="60"></label>
+          <label>黑发上限<input id="blackDepthMax" type="number" min="0" max="100" step="0.1" value="100"></label>
+        </div>
+        <label class="check"><input id="showHairOverlay" type="checkbox" checked>在原图上显示黑白发遮罩</label>
+        <p id="hairRangeNote" class="muted"></p>
+        <div id="hairAreaCards" class="hair-area-grid"><div class="empty">完成分析后显示</div></div>
+        <div id="hairRegionTable"></div>
+
+        <h3>质量控制</h3>
+        <div class="button-grid">
+          <button id="saveDraft">保存草稿</button>
+          <button id="confirmNext" class="primary">确认并下一张</button>
+          <button id="markLow">标记低质量</button>
+          <button id="markNoRegion">无可识别手术区</button>
+        </div>
+      </aside>
+    </section>
+
+    <section id="groupsView" class="app-view page hidden">
+      <div class="page-heading"><div><h1>批量实验分组</h1><p>一张图片属于一个主实验组。</p></div></div>
+      <div class="group-layout">
+        <aside class="group-panel">
+          <label>新组名称<span class="path-row"><input id="groupName"><button id="addGroup">添加</button></span></label>
+          <div id="groupList"></div>
+        </aside>
+        <section class="table-panel">
+          <div class="table-actions">
+            <input id="groupFilter" placeholder="筛选图片">
+            <button id="selectVisible">选择当前结果</button>
+            <button id="clearSelection">清空选择</button>
+            <select id="assignGroupSelect"></select>
+            <button id="assignSelected" class="primary">分配所选图片</button>
+          </div>
+          <table><thead><tr><th></th><th>图片</th><th>当前分组</th><th>状态</th></tr></thead><tbody id="groupImageTable"></tbody></table>
+        </section>
+      </div>
+    </section>
+
+    <section id="exportView" class="app-view page hidden">
+      <div class="page-heading"><div><h1>项目设置与导出</h1><p>统一标准模式会在导出时按同一分界值重新计算全部已确认图片。</p></div></div>
+      <div class="settings-grid">
+        <article>
+          <h2>最终导出标准</h2>
+          <label class="check"><input id="useStandard" type="checkbox" checked>所有图片使用项目统一标准</label>
+          <label>统一左/中分界（%）<input id="standardLeft" type="number" min="1" max="98" value="40"></label>
+          <label>统一中/右分界（%）<input id="standardRight" type="number" min="2" max="99" value="60"></label>
+          <label>灰卡标准 L*<input id="grayTarget" type="number" min="1" max="100" step="0.1" value="50"></label>
+          <button id="saveSettings" class="primary">保存项目设置</button>
+        </article>
+        <article>
+          <h2>导出</h2>
+          <p>仅导出“已确认”的图片；低质量和无可识别区域的图片保留在清单中，但不进入统计。</p>
+          <label>结果文件夹位置（默认使用待分析图片文件夹）<span class="path-row"><input id="exportPath"><button id="browseExport">浏览</button></span></label>
+          <button id="exportResults" class="primary wide">导出 CSV、直方图和标注图</button>
+          <p id="exportStatus" class="muted"></p>
+        </article>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
